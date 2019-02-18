@@ -44,7 +44,9 @@ func main() {
 	// var wg sync.WaitGroup
 	// wg.Add(1)
 	// ListenForReceive()
-	SubscribeNewBlock()
+	// GetBalance()
+	// GetTxInfo()
+	TestSendEth()
 	// IsSubscribedTxPending()
 	// DoubleSubscription()
 	// go ListenToContract()
@@ -71,6 +73,115 @@ type LogApproval struct {
 	TokenOwner common.Address
 	Spender    common.Address
 	Tokens     *big.Int
+}
+
+func TestSendEth() {
+
+	client, err := ethclient.Dial("https://ropsten.infura.io")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	privateKey, err := crypto.HexToECDSA("4B1ACD7E32ADF56BC9F9416D06672850A535BFC6821A637ACD849D03A1A014DD")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fromAddress := common.HexToAddress("0x7A8a7870bd398240CE3523Ab7E76153ba34B7116")
+	toAddress := common.HexToAddress("0xC40C7f7C427642CC7aABC8fe523e0905b040E6E2")
+	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		log.Fatal(err)
+	}
+	value := big.NewInt(1000000000000000000) // in wei (1 eth)
+	gasLimit := uint64(21000)                // in units
+	gasPrice, err := client.SuggestGasPrice(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	var data []byte
+	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, data)
+
+	chainID, err := client.NetworkID(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = client.SendTransaction(context.Background(), signedTx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("gas price: ", gasPrice)
+	fmt.Println("gas limit: ", gasLimit)
+	fmt.Printf("tx sent: %s", signedTx.Hash().Hex())
+}
+
+func GetTxInfo() {
+	ctx := context.Background()
+	client, err := ethclient.Dial("https://ropsten.infura.io")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	gasPrice, err := client.SuggestGasPrice(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	toAddress := common.HexToAddress("0xC40C7f7C427642CC7aABC8fe523e0905b040E6E2")
+
+	amount := "1000000000000000000"
+	a, _ := new(big.Int).SetString(amount, 10)
+	data := ConstructTokenTxData(toAddress, a)
+
+	gasLimit, err := client.EstimateGas(ctx, ethereum.CallMsg{
+		To:   &toAddress,
+		Data: data,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println(gasPrice, gasLimit)
+}
+
+// ConstructTokenTxData constructs data for transfer token
+func ConstructTokenTxData(toAddress common.Address, amount *big.Int) []byte {
+	transferFnSignature := []byte("transfer(address,uint256)")
+	hash := sha3.NewKeccak256()
+	hash.Write(transferFnSignature)
+	methodID := hash.Sum(nil)[:4] // 0xa9059cbb
+
+	paddedAddress := common.LeftPadBytes(toAddress.Bytes(), 32)
+	paddedAmount := common.LeftPadBytes(amount.Bytes(), 32)
+
+	var data []byte
+	data = append(data, methodID...)
+	data = append(data, paddedAddress...)
+	data = append(data, paddedAmount...)
+
+	return data
+}
+
+func GetBalance() {
+	client, err := ethclient.Dial("https://ropsten.infura.io")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	account := common.HexToAddress("0xC40C7f7C427642CC7aABC8fe523e0905b040E6E2")
+	balance, err := client.BalanceAt(context.Background(), account, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(balance)
 }
 
 func ReadEventLogs() {

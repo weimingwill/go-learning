@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"os"
 	"time"
 )
 
@@ -19,8 +18,9 @@ type Test struct {
 }
 
 func main() {
+	err := fmt.Errorf("this is error")
 
-	fmt.Println(os.Getenv("HUO"))
+	fmt.Printf("%s\n", err)
 	// a := [][]string{[]string{"z"}, []string{"a", "asd"}}
 	// b := "asdf"
 	// fmt.Println(a, string(b[1]))
